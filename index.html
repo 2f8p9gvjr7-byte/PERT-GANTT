@@ -445,13 +445,13 @@ svg#arrows {
         <button class="btn" id="btnZoomIn">+</button>
         <button class="btn" id="btnZoomOut">-</button>
         <button class="btn" id="btnFit">&#8861;</button>
-        <button class="btn" id="btnPDF" title="Exporter PDF" style="font-size:16px;">&#128196;</button>
       </div>
     </div>
     <div class="info-bar">
       <div>T: <span id="infoCount">0</span></div>
       <div>Dur&eacute;e: <span id="infoDuration">0</span><span id="infoDurUnit">j</span></div>
       <div class="info-crit">Critique: <span id="infoCritical">&mdash;</span></div>
+      <button id="btnPDF" onclick="exportPDF()" style="background:var(--accent);border:none;border-radius:6px;color:#0e1628;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;padding:4px 8px;cursor:pointer;flex-shrink:0;">&#128196; PDF</button>
     </div>
   </div>
 
