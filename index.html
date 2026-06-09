@@ -134,7 +134,10 @@ header {
   color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .header-title p { font-size: 9px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
-.header-actions { display: flex; gap: 5px; flex-shrink: 0; }
+.header-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
+.btn-lbl { font-size: 9px; }
+/* On very narrow screens hide labels */
+@media (max-width: 360px) { .btn-lbl { display: none; } }
 
 .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
 .tab {
@@ -409,10 +412,10 @@ svg#arrows {
       <p id="headerProjSub"></p>
     </div>
     <div class="header-actions">
-      <button class="btn sm" id="btnSettings">&#9881;</button>
-      <button class="btn sm" id="btnLayout">&#8859;</button>
-      <button class="btn sm" id="btnConnect">&#8674;</button>
-      <button class="btn sm" id="btnPDF">&#128196;</button>
+      <button class="btn sm" id="btnSettings" title="Param&egrave;tres">&#9881; <span class="btn-lbl">R&eacute;glag.</span></button>
+      <button class="btn sm" id="btnLayout" title="R&eacute;organiser">&#8859; <span class="btn-lbl">Auto</span></button>
+      <button class="btn sm" id="btnConnect" title="Mode liaison">&#8674; <span class="btn-lbl">Lier</span></button>
+      <button class="btn sm" id="btnPDF" title="Exporter PDF">&#128196; <span class="btn-lbl">PDF</span></button>
       <button class="btn sm primary" id="btnAdd">&#65291;</button>
     </div>
   </header>
@@ -1653,17 +1656,19 @@ function exportPDF() {
     var pnames = (t.preds||[]).map(function(pid){
       var pp=tasks.filter(function(x){return x.id===pid;})[0]; return pp?pp.id:'?';
     }).join(', ') || '—';
-    var bg = t.critical ? '#2a0e15' : 'transparent';
-    var color = t.critical ? '#e05c7a' : '#e8eef5';
-    return '<tr style="background:'+bg+'">'
-      +'<td style="color:'+color+';font-weight:'+(t.critical?'700':'400')+'">'+t.id+'</td>'
-      +'<td style="color:'+color+'">'+t.name+'</td>'
-      +'<td style="text-align:center">'+t.dur+SUF+'</td>'
-      +'<td style="text-align:center;color:#f5a623">'+PRE+t.es+'</td>'
-      +'<td style="text-align:center;color:#f5a623">'+PRE+t.ef+'</td>'
-      +'<td style="text-align:center;color:#5bc4f5">'+PRE+(t.ls===Infinity?'?':t.ls)+'</td>'
-      +'<td style="text-align:center;color:'+(t.slack===0?'#e05c7a':'#27ae60')+'">'+t.slack+SUF+'</td>'
-      +'<td style="color:#6a7fa0">'+pnames+'</td>'
+    var isCrit = t.critical;
+    var rowBg  = isCrit ? '#fff0f0' : '#ffffff';
+    var idColor= isCrit ? '#c0392b' : '#1a1a2e';
+    var nmColor= isCrit ? '#c0392b' : '#1a1a2e';
+    return '<tr style="background:'+rowBg+'">'
+      +'<td style="color:'+idColor+';font-weight:700">'+t.id+'</td>'
+      +'<td style="color:'+nmColor+';font-weight:'+(isCrit?'700':'400')+'">'+t.name+'</td>'
+      +'<td style="text-align:center;color:#333">'+t.dur+SUF+'</td>'
+      +'<td style="text-align:center;color:#1a6b2a;font-weight:600">'+PRE+t.es+'</td>'
+      +'<td style="text-align:center;color:#1a6b2a;font-weight:600">'+PRE+t.ef+'</td>'
+      +'<td style="text-align:center;color:#1a5c8a;font-weight:600">'+PRE+(t.ls===Infinity?'?':t.ls)+'</td>'
+      +'<td style="text-align:center;color:'+(t.slack===0?'#c0392b':'#1a6b2a')+';font-weight:700">'+t.slack+SUF+'</td>'
+      +'<td style="color:#555">'+pnames+'</td>'
       +'</tr>';
   }).join('');
 
@@ -1692,26 +1697,22 @@ function exportPDF() {
     +'<style>'
     +'*{box-sizing:border-box;margin:0;padding:0}'
     +'body{font-family:Arial,sans-serif;font-size:11px;background:#fff;color:#1a1a2e;padding:20px}'
-    +'h1{font-size:20px;color:#0e1628;margin-bottom:4px}'
-    +'h2{font-size:13px;color:#f5a623;margin:18px 0 8px;border-bottom:2px solid #f5a623;padding-bottom:4px;text-transform:uppercase;letter-spacing:1px}'
-    +'.meta{font-size:10px;color:#666;margin-bottom:16px}'
-    +'.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}'
-    +'.stat-box{background:#f0f4f8;border-radius:8px;padding:10px 12px;border-left:3px solid #f5a623}'
-    +'.stat-label{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.5px}'
-    +'.stat-val{font-size:20px;font-weight:800;color:#0e1628;line-height:1.2}'
-    +'.cp-box{background:#fff5f5;border:1px solid #e05c7a;border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:11px;color:#e05c7a}'
+    +'h1{font-size:20px;color:#1a1a2e;margin-bottom:4px}'
+    +'h2{font-size:13px;color:#b07800;margin:18px 0 8px;border-bottom:2px solid #f5a623;padding-bottom:4px;text-transform:uppercase;letter-spacing:1px}'
+    +'.meta{font-size:10px;color:#555;margin-bottom:16px}'
+    +'.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}'
+    +'.stat-box{background:#f5f7fa;border-radius:8px;padding:10px 12px;border-left:3px solid #f5a623}'
+    +'.stat-label{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.5px}'
+    +'.stat-val{font-size:20px;font-weight:800;color:#1a1a2e;line-height:1.2}'
+    +'.cp-box{background:#fff5f5;border:1px solid #c0392b;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:#c0392b;font-weight:600}'
     +'table{width:100%;border-collapse:collapse;margin-bottom:6px}'
-    +'th{background:#0e1628;color:#f5a623;font-size:9px;padding:6px 8px;text-align:left;letter-spacing:0.5px;text-transform:uppercase}'
-    +'td{padding:5px 8px;border-bottom:1px solid #e8edf2;font-size:10px;color:#1a1a2e}'
-    +'tr:hover td{background:#f8f9fb}'
+    +'th{background:#1a2540;color:#f5a623;font-size:9px;padding:7px 8px;text-align:left;letter-spacing:0.5px;text-transform:uppercase}'
+    +'td{padding:5px 8px;border-bottom:1px solid #dde3ec;font-size:10px;color:#1a1a2e}'
+    +'tr:nth-child(even) td{background:#f5f7fa}'
     +'.gantt-section{page-break-before:always}'
-    +'.gantt-bg{background:#0e1628;border-radius:8px;padding:10px;display:inline-block}'
-    +'.footer{margin-top:20px;font-size:9px;color:#aaa;text-align:right;border-top:1px solid #eee;padding-top:8px}'
-    +'@media print{'
-      +'body{padding:10px}'
-      +'.gantt-section{page-break-before:always}'
-      +'button{display:none}'
-    +'}'
+    +'.gantt-bg{background:#0e1628;border-radius:8px;padding:10px;display:inline-block;max-width:100%}'
+    +'.footer{margin-top:20px;font-size:9px;color:#888;text-align:right;border-top:1px solid #dde;padding-top:8px}'
+    +'@media print{body{padding:8px}.gantt-section{page-break-before:always}button{display:none!important}}'
     +'</style></head><body>'
 
     // Header
@@ -1724,7 +1725,7 @@ function exportPDF() {
     +'<div class="stats">'
       +'<div class="stat-box"><div class="stat-label">Durée totale</div><div class="stat-val">'+res.maxEF+'<span style="font-size:13px;font-weight:400"> '+SUF+'</span></div></div>'
       +'<div class="stat-box"><div class="stat-label">Tâches</div><div class="stat-val">'+tasks.length+'</div></div>'
-      +'<div class="stat-box" style="border-left-color:#e05c7a"><div class="stat-label">Sur chemin critique</div><div class="stat-val" style="color:#e05c7a">'+res.critTasks.length+'</div></div>'
+      +'<div class="stat-box" style="border-left-color:#c0392b"><div class="stat-label">Sur chemin critique</div><div class="stat-val" style="color:#c0392b">'+res.critTasks.length+'</div></div>'
     +'</div>'
     +'<div class="cp-box">&#9888; Chemin critique : '+cpText+'</div>'
 

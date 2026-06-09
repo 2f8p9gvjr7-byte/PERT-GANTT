@@ -1,4 +1,5 @@
-const CACHE_NAME = 'pert-planner-v1';
+const CACHE_NAME = 'pert-planner-v3';
+
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -6,24 +7,18 @@ const ASSETS = [
   './icon-512.png'
 ];
 
-// Font URLs to cache
-const FONT_URLS = [
-  'https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap',
-  'https://fonts.gstatic.com'
-];
-
-// Install: cache all local assets
+// Install: cache all local assets, always take control immediately
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
       return cache.addAll(ASSETS);
     }).then(function() {
-      return self.skipWaiting();
+      return self.skipWaiting(); // Force new SW to activate immediately
     })
   );
 });
 
-// Activate: clean old caches
+// Activate: delete ALL old caches, claim all clients immediately
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
@@ -32,45 +27,51 @@ self.addEventListener('activate', function(event) {
             .map(function(key) { return caches.delete(key); })
       );
     }).then(function() {
-      return self.clients.claim();
+      return self.clients.claim(); // Take control of all open tabs
     })
   );
 });
 
-// Fetch: cache-first for local, network-first for fonts, offline fallback
+// Fetch: network-first for HTML (always get latest), cache-first for others
 self.addEventListener('fetch', function(event) {
   var url = event.request.url;
 
-  // Google Fonts: try network, fallback to cache (system fonts used if both fail)
+  // Google Fonts: network first, fallback to cache
   if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com')) {
     event.respondWith(
-      caches.open(CACHE_NAME).then(function(cache) {
-        return cache.match(event.request).then(function(cached) {
-          var networkFetch = fetch(event.request).then(function(response) {
-            if (response && response.status === 200) {
-              cache.put(event.request, response.clone());
-            }
-            return response;
-          }).catch(function() { return cached; });
-          return cached || networkFetch;
-        });
+      fetch(event.request).then(function(response) {
+        var clone = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, clone); });
+        return response;
+      }).catch(function() {
+        return caches.match(event.request);
       })
     );
     return;
   }
 
-  // Local assets: cache-first
+  // index.html: ALWAYS network-first so updates are picked up immediately
+  if (url.endsWith('index.html') || url.endsWith('/') || url.endsWith('/PERT-GANTT/')) {
+    event.respondWith(
+      fetch(event.request).then(function(response) {
+        var clone = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, clone); });
+        return response;
+      }).catch(function() {
+        return caches.match(event.request);
+      })
+    );
+    return;
+  }
+
+  // Other assets: cache-first
   event.respondWith(
     caches.match(event.request).then(function(cached) {
       if (cached) return cached;
       return fetch(event.request).then(function(response) {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
-        var responseClone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, responseClone);
-        });
+        if (!response || response.status !== 200) return response;
+        var clone = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, clone); });
         return response;
       });
     })
