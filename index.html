@@ -1664,15 +1664,15 @@ function exportPDF() {
   var ganttSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="'+svgW+'" height="'+svgH+'" viewBox="0 0 '+svgW+' '+svgH+'">'+svgRows+'</svg>';
   var ganttB64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(ganttSVG)));
 
-  // French date/time formatter
+  // French date/time formatter — converts YYYY-MM-DD to DD/MM/YYYY
   function fmtFR(val) {
-    if (!val) return null;
-    // HH:MM — return as-is (already French format)
-    if (val.match(/^\d{2}:\d{2}$/)) return val;
-    // YYYY-MM-DD → jj/mm/aaaa
-    if (val.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      var pts = val.split('-');
-      return pts[2]+'/'+pts[1]+'/'+pts[0];
+    if (!val) return '';
+    val = String(val).trim();
+    // HH:MM — already readable
+    if (val.length === 5 && val.charAt(2) === ':') return val;
+    // YYYY-MM-DD → DD/MM/YYYY
+    if (val.length === 10 && val.charAt(4) === '-' && val.charAt(7) === '-') {
+      return val.slice(8,10) + '/' + val.slice(5,7) + '/' + val.slice(0,4);
     }
     return val;
   }
@@ -1686,9 +1686,9 @@ function exportPDF() {
     var rowBg   = isCrit ? '#fff0f0' : '#ffffff';
     var idColor = isCrit ? '#c0392b' : '#1a1a2e';
     var nmColor = isCrit ? '#c0392b' : '#1a1a2e';
-    var realES  = fmtFR(t.dateES) || PRE+t.es;
-    var realEF  = fmtFR(t.dateEF) || PRE+t.ef;
-    var realLS  = fmtFR(t.dateLS) || PRE+(t.ls===Infinity?'?':t.ls);
+    var realES  = t.dateES ? fmtFR(t.dateES) : PRE+t.es;
+    var realEF  = t.dateEF ? fmtFR(t.dateEF) : PRE+t.ef;
+    var realLS  = t.dateLS ? fmtFR(t.dateLS) : PRE+(t.ls===Infinity?'?':t.ls);
     return '<tr style="background:'+rowBg+'">'
       +'<td style="color:'+idColor+';font-weight:700">'+t.id+'</td>'
       +'<td style="color:'+nmColor+';font-weight:'+(isCrit?'700':'400')+'">'+t.name+'</td>'
@@ -1710,9 +1710,9 @@ function exportPDF() {
   // Date info line in French
   var dateInfo = '';
   if (p._realStart && p._realEnd) {
-    var startFR = fmtFR(p._realStart) || p._realStart;
-    var endFR   = fmtFR(p._realEnd)   || p._realEnd;
-    var ancFR   = fmtFR(p.dateAnchor) || p.dateAnchor;
+    var startFR = p._realStart ? fmtFR(p._realStart) : p._realStart;
+    var endFR   = p._realEnd   ? fmtFR(p._realEnd)   : p._realEnd;
+    var ancFR   = p.dateAnchor ? fmtFR(p.dateAnchor) : p.dateAnchor;
     dateInfo = '<p style="margin:0 0 8px;font-size:11px;color:#1a5c8a">&#128197; '
       +(p.dateMode==='end'?'Date de fin\u00a0: ':'Date de d\u00e9but\u00a0: ')
       +'<b>'+ancFR+'</b> &nbsp;| P\u00e9riode\u00a0: <b>'+startFR+' \u2192 '+endFR+'</b></p>';
