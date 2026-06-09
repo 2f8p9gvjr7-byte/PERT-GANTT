@@ -409,9 +409,10 @@ svg#arrows {
       <p id="headerProjSub"></p>
     </div>
     <div class="header-actions">
-      <button class="btn sm" id="btnSettings">&#9881;&#65039;</button>
-      <button class="btn sm" id="btnLayout">&#8859; Auto</button>
-      <button class="btn sm" id="btnConnect">&#8674; Lier</button>
+      <button class="btn sm" id="btnSettings">&#9881;</button>
+      <button class="btn sm" id="btnLayout">&#8859;</button>
+      <button class="btn sm" id="btnConnect">&#8674;</button>
+      <button class="btn sm" id="btnPDF">&#128196;</button>
       <button class="btn sm primary" id="btnAdd">&#65291;</button>
     </div>
   </header>
@@ -451,7 +452,6 @@ svg#arrows {
       <div>T: <span id="infoCount">0</span></div>
       <div>Dur&eacute;e: <span id="infoDuration">0</span><span id="infoDurUnit">j</span></div>
       <div class="info-crit">Critique: <span id="infoCritical">&mdash;</span></div>
-      <button id="btnPDF" onclick="exportPDF()" style="background:var(--accent);border:none;border-radius:6px;color:#0e1628;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;padding:4px 8px;cursor:pointer;flex-shrink:0;">&#128196; PDF</button>
     </div>
   </div>
 
@@ -1564,17 +1564,21 @@ cw.addEventListener('touchend',function(){ panStart=null; });
 document.getElementById('btnBack').addEventListener('click',goBack);
 document.getElementById('btnAdd').addEventListener('click',openAddTask);
 document.getElementById('btnPDF').addEventListener('click',exportPDF);
+document.getElementById('btnLayout').title='Réorganiser automatiquement';
+document.getElementById('btnConnect').title='Mode liaison';
+document.getElementById('btnSettings').title='Paramètres';
+document.getElementById('btnPDF').title='Exporter PDF / E-mail';
 document.getElementById('btnLayout').addEventListener('click',function(){ autoLayout(); saveTasks(); renderGraph(); });
 document.getElementById('btnConnect').addEventListener('click',function(){
   connectMode=!connectMode; connectSource=null;
   document.getElementById('connectBanner').classList.toggle('show',connectMode);
-  document.getElementById('btnConnect').textContent=connectMode?'x Annuler':'\u21e2 Lier';
+  document.getElementById('btnConnect').textContent=connectMode?'\u2715':'\u21e2';
   if (!connectMode) document.querySelectorAll('.node').forEach(function(n){n.style.outline='';});
 });
 document.getElementById('btnCancelConnect').addEventListener('click',function(){
   connectMode=false; connectSource=null;
   document.getElementById('connectBanner').classList.remove('show');
-  document.getElementById('btnConnect').textContent='\u21e2 Lier';
+  document.getElementById('btnConnect').textContent='\u21e2';
   document.querySelectorAll('.node').forEach(function(n){n.style.outline='';});
 });
 document.getElementById('btnTaskSave').addEventListener('click',saveTask);
