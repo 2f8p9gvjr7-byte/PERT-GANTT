@@ -412,6 +412,7 @@ svg#arrows {
       <button class="btn sm" id="btnSettings">&#9881;&#65039;</button>
       <button class="btn sm" id="btnLayout">&#8859; Auto</button>
       <button class="btn sm" id="btnConnect">&#8674; Lier</button>
+      <button class="btn sm" id="btnPDF">&#128196; PDF</button>
       <button class="btn sm primary" id="btnAdd">&#65291;</button>
     </div>
   </header>
@@ -1553,6 +1554,7 @@ cw.addEventListener('touchend',function(){ panStart=null; });
 
 document.getElementById('btnBack').addEventListener('click',goBack);
 document.getElementById('btnAdd').addEventListener('click',openAddTask);
+document.getElementById('btnPDF').addEventListener('click',exportPDF);
 document.getElementById('btnLayout').addEventListener('click',function(){ autoLayout(); saveTasks(); renderGraph(); });
 document.getElementById('btnConnect').addEventListener('click',function(){
   connectMode=!connectMode; connectSource=null;
@@ -1579,6 +1581,179 @@ document.getElementById('btnProjSave').addEventListener('click',saveProject);
 document.getElementById('btnProjCancel').addEventListener('click',function(){document.getElementById('modalProj').classList.remove('open');});
 document.getElementById('modalProj').addEventListener('click',function(e){if(e.target===e.currentTarget)document.getElementById('modalProj').classList.remove('open');});
 document.getElementById('fProjName').addEventListener('keydown',function(e){if(e.key==='Enter')saveProject();});
+
+// ══════════════════════════════════════════
+// PDF EXPORT
+// ══════════════════════════════════════════
+function exportPDF() {
+  var p   = currentProj();
+  if (!p || !tasks.length) { alert('Aucune tâche à exporter.'); return; }
+  var res  = calcPert();
+  var PRE  = unitPrefix(p);
+  var SUF  = unitSuffix(p);
+  var FULL = unitFull(p);
+
+  var sorted = tasks.slice().sort(function(a,b){ return a.es-b.es; });
+
+  // Build Gantt SVG (inline in PDF)
+  var maxEF = res.maxEF;
+  var colW  = 18;
+  var rowH  = 22;
+  var lblW  = 120;
+  var svgW  = lblW + (maxEF+1)*colW;
+  var svgH  = 28 + sorted.length * rowH;
+
+  var svgRows = '';
+  // Grid header
+  for (var c = 0; c <= maxEF; c++) {
+    svgRows += '<rect x="'+(lblW+c*colW)+'" y="0" width="'+colW+'" height="24" fill="'+(c%2===0?'#1a2540':'#1e2d47')+'"/>';
+    svgRows += '<text x="'+(lblW+c*colW+colW/2)+'" y="16" text-anchor="middle" font-size="7" fill="#6a7fa0">'+PRE+c+'</text>';
+  }
+  // Task rows
+  sorted.forEach(function(t, i) {
+    var y = 26 + i*rowH;
+    // Row bg
+    svgRows += '<rect x="0" y="'+y+'" width="'+svgW+'" height="'+rowH+'" fill="'+(i%2===0?'#0e1628':'#1e2d47')+'"/>';
+    // Grid cells
+    for (var c2=0;c2<=maxEF;c2++) {
+      svgRows += '<rect x="'+(lblW+c2*colW)+'" y="'+y+'" width="'+colW+'" height="'+rowH+'" fill="none" stroke="#2e3d5a" stroke-width="0.3"/>';
+    }
+    // Label
+    var lbl = t.name.length > 16 ? t.name.slice(0,15)+'…' : t.name;
+    svgRows += '<text x="4" y="'+(y+rowH/2+4)+'" font-size="8" fill="'+(t.critical?'#e05c7a':'#e8eef5')+'">'+lbl+'</text>';
+    // ES bar
+    var bx = lblW + t.es*colW;
+    var bw = Math.max(colW*0.5, t.dur*colW);
+    svgRows += '<rect x="'+bx+'" y="'+(y+4)+'" width="'+bw+'" height="'+(rowH-8)+'" rx="3" fill="'+(t.critical?'#e05c7a':'#f5a623')+'"/>';
+    // Slack bar
+    if (t.slack>0 && t.slack!==Infinity) {
+      var sx = lblW + t.ef*colW;
+      var sw2 = t.slack*colW;
+      svgRows += '<rect x="'+sx+'" y="'+(y+6)+'" width="'+sw2+'" height="'+(rowH-12)+'" rx="2" fill="none" stroke="#6a7fa0" stroke-width="1" stroke-dasharray="2,2"/>';
+    }
+  });
+  var ganttSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="'+svgW+'" height="'+svgH+'" viewBox="0 0 '+svgW+' '+svgH+'">'+svgRows+'</svg>';
+  var ganttB64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(ganttSVG)));
+
+  // Build task table rows
+  var tableRows = sorted.map(function(t) {
+    var pnames = (t.preds||[]).map(function(pid){
+      var pp=tasks.filter(function(x){return x.id===pid;})[0]; return pp?pp.id:'?';
+    }).join(', ') || '—';
+    var bg = t.critical ? '#2a0e15' : 'transparent';
+    var color = t.critical ? '#e05c7a' : '#e8eef5';
+    return '<tr style="background:'+bg+'">'
+      +'<td style="color:'+color+';font-weight:'+(t.critical?'700':'400')+'">'+t.id+'</td>'
+      +'<td style="color:'+color+'">'+t.name+'</td>'
+      +'<td style="text-align:center">'+t.dur+SUF+'</td>'
+      +'<td style="text-align:center;color:#f5a623">'+PRE+t.es+'</td>'
+      +'<td style="text-align:center;color:#f5a623">'+PRE+t.ef+'</td>'
+      +'<td style="text-align:center;color:#5bc4f5">'+PRE+(t.ls===Infinity?'?':t.ls)+'</td>'
+      +'<td style="text-align:center;color:'+(t.slack===0?'#e05c7a':'#27ae60')+'">'+t.slack+SUF+'</td>'
+      +'<td style="color:#6a7fa0">'+pnames+'</td>'
+      +'</tr>';
+  }).join('');
+
+  // Critical path
+  var cpText = res.critTasks.map(function(t){return t.id+' '+t.name;}).join(' → ');
+
+  // Stats
+  var noCrit = tasks.filter(function(t){return !t.critical;});
+  var avgSlack = noCrit.length ? (noCrit.reduce(function(s,t){return s+(t.slack||0);},0)/noCrit.length).toFixed(1) : '—';
+
+  // Date info
+  var dateInfo = '';
+  if (p._realStart && p._realEnd) {
+    dateInfo = '<p style="margin:0 0 4px;font-size:11px;color:#5bc4f5">&#128197; '
+      + (p.dateMode==='end'?'Date de fin : ':'Date de début : ')
+      + '<b>'+p.dateAnchor+'</b>'
+      + ' &nbsp;|&nbsp; Période : <b>'+p._realStart+' → '+p._realEnd+'</b></p>';
+  }
+
+  // Build full HTML page
+  var now = new Date().toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  var html = '<!DOCTYPE html><html lang="fr"><head>'
+    +'<meta charset="UTF-8">'
+    +'<title>PERT - '+p.name+'</title>'
+    +'<style>'
+    +'*{box-sizing:border-box;margin:0;padding:0}'
+    +'body{font-family:Arial,sans-serif;font-size:11px;background:#fff;color:#1a1a2e;padding:20px}'
+    +'h1{font-size:20px;color:#0e1628;margin-bottom:4px}'
+    +'h2{font-size:13px;color:#f5a623;margin:18px 0 8px;border-bottom:2px solid #f5a623;padding-bottom:4px;text-transform:uppercase;letter-spacing:1px}'
+    +'.meta{font-size:10px;color:#666;margin-bottom:16px}'
+    +'.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}'
+    +'.stat-box{background:#f0f4f8;border-radius:8px;padding:10px 12px;border-left:3px solid #f5a623}'
+    +'.stat-label{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:0.5px}'
+    +'.stat-val{font-size:20px;font-weight:800;color:#0e1628;line-height:1.2}'
+    +'.cp-box{background:#fff5f5;border:1px solid #e05c7a;border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:11px;color:#e05c7a}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:6px}'
+    +'th{background:#0e1628;color:#f5a623;font-size:9px;padding:6px 8px;text-align:left;letter-spacing:0.5px;text-transform:uppercase}'
+    +'td{padding:5px 8px;border-bottom:1px solid #e8edf2;font-size:10px;color:#1a1a2e}'
+    +'tr:hover td{background:#f8f9fb}'
+    +'.gantt-section{page-break-before:always}'
+    +'.gantt-bg{background:#0e1628;border-radius:8px;padding:10px;display:inline-block}'
+    +'.footer{margin-top:20px;font-size:9px;color:#aaa;text-align:right;border-top:1px solid #eee;padding-top:8px}'
+    +'@media print{'
+      +'body{padding:10px}'
+      +'.gantt-section{page-break-before:always}'
+      +'button{display:none}'
+    +'}'
+    +'</style></head><body>'
+
+    // Header
+    +'<h1>&#9672; '+p.name+'</h1>'
+    +'<div class="meta">'+(p.desc?p.desc+' &nbsp;|&nbsp; ':'')+FULL+' &nbsp;|&nbsp; Généré le '+now+'</div>'
+    +dateInfo
+
+    // Stats
+    +'<h2>Résumé</h2>'
+    +'<div class="stats">'
+      +'<div class="stat-box"><div class="stat-label">Durée totale</div><div class="stat-val">'+res.maxEF+'<span style="font-size:13px;font-weight:400"> '+SUF+'</span></div></div>'
+      +'<div class="stat-box"><div class="stat-label">Tâches</div><div class="stat-val">'+tasks.length+'</div></div>'
+      +'<div class="stat-box" style="border-left-color:#e05c7a"><div class="stat-label">Sur chemin critique</div><div class="stat-val" style="color:#e05c7a">'+res.critTasks.length+'</div></div>'
+    +'</div>'
+    +'<div class="cp-box">&#9888; Chemin critique : '+cpText+'</div>'
+
+    // Task table
+    +'<h2>Toutes les tâches</h2>'
+    +'<table><thead><tr>'
+      +'<th>ID</th><th>Nom</th><th>Durée</th>'
+      +'<th>ES</th><th>EF</th><th>LS</th><th>Marge</th><th>Antécédents</th>'
+    +'</tr></thead><tbody>'+tableRows+'</tbody></table>'
+
+    // Gantt
+    +'<div class="gantt-section">'
+    +'<h2>Diagramme de Gantt</h2>'
+    +'<div class="gantt-bg"><img src="'+ganttB64+'" style="max-width:100%;display:block"/></div>'
+    +'</div>'
+
+    // Footer
+    +'<div class="footer">PERT &amp; GANTT Planner &mdash; '+p.name+' &mdash; '+now+'</div>'
+
+    // Print button (hidden in print)
+    +'<div style="text-align:center;margin-top:16px">'
+      +'<button onclick="window.print()" style="background:#f5a623;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;color:#0e1628">&#128424; Imprimer / Enregistrer en PDF</button>'
+      +'<button onclick="window.close()" style="background:#eee;border:none;border-radius:8px;padding:10px 16px;font-size:12px;cursor:pointer;margin-left:8px;color:#333">Fermer</button>'
+    +'</div>'
+    +'</body></html>';
+
+  // Open in new window
+  var win = window.open('', '_blank', 'width=800,height=700');
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  } else {
+    // Fallback: download as HTML file (then print as PDF)
+    var blob = new Blob([html], {type:'text/html'});
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href   = url;
+    a.download = p.name.replace(/[^a-z0-9]/gi,'_')+'_PERT.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+}
 
 // ══════════════════════════════════════════
 // GANTT
