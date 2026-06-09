@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Cartes de visite</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Cartes"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<meta name="theme-color" content="#0d1321"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#0d1321;font-family:-apple-system,sans-serif;color:#c5d3e3;padding-bottom:4rem;}
+.header{background:#0d1321;padding:1rem;border-bottom:2px solid #4A6FA5;position:sticky;top:0;z-index:50;}
+.header-top{display:flex;align-items:center;justify-content:space-between;}
+.app-title{font-size:1.3rem;font-weight:800;color:#4A6FA5;letter-spacing:.05em;}
+.app-sub{font-size:.6rem;color:#6a7fa0;letter-spacing:.15em;text-transform:uppercase;}
+.btn-scan{background:#4A6FA5;color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:.82rem;font-weight:700;cursor:pointer;}
+.search-wrap{padding:.7rem 1rem;background:#0d1321;}
+.search-input{width:100%;background:#1a2540;border:1px solid #2e3d5a;border-radius:10px;padding:11px 14px;font-size:.95rem;color:#e8f0f8;outline:none;}
+.search-input:focus{border-color:#4A6FA5;}
+.search-input::placeholder{color:#3a4868;}
+.cards-list{padding:.5rem 1rem;}
+.card-item{background:#1a2540;border:1px solid #2e3d5a;border-radius:14px;padding:1rem;margin-bottom:.8rem;cursor:pointer;transition:border-color .15s;}
+.card-item:active{border-color:#4A6FA5;}
+.card-name{font-size:1rem;font-weight:800;color:#e8f0f8;margin-bottom:.3rem;}
+.card-company{font-size:.82rem;color:#4A6FA5;font-weight:600;margin-bottom:.2rem;}
+.card-info{font-size:.75rem;color:#6a7fa0;line-height:1.6;}
+.card-date{font-size:.65rem;color:#2e3d5a;margin-top:.4rem;}
+.empty-state{text-align:center;padding:3rem 1rem;color:#2e3d5a;font-size:.9rem;line-height:1.8;}
+.empty-icon{font-size:3rem;margin-bottom:1rem;}
+
+/* Modal scan */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;flex-direction:column;}
+.modal.open{display:flex;}
+.modal-header{background:#0d1321;padding:1rem;border-bottom:1px solid #2e3d5a;display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:1rem;font-weight:800;color:#4A6FA5;}
+.btn-close{background:none;border:none;color:#6a7fa0;font-size:1.3rem;cursor:pointer;padding:4px 8px;}
+.modal-body{flex:1;overflow-y:auto;padding:1rem;}
+
+/* Photo zone */
+.photo-zone{border:2px dashed #2e3d5a;border-radius:14px;padding:2rem;text-align:center;margin-bottom:1rem;cursor:pointer;background:#1a2540;}
+.photo-zone.has-photo{border-color:#4A6FA5;padding:.5rem;}
+.photo-zone img{width:100%;border-radius:10px;max-height:200px;object-fit:cover;}
+.photo-label{color:#6a7fa0;font-size:.85rem;margin-top:.5rem;}
+input[type=file]{display:none;}
+
+/* OCR status */
+.ocr-status{text-align:center;padding:.8rem;border-radius:10px;margin-bottom:1rem;font-size:.82rem;font-weight:600;}
+.ocr-status.loading{background:#1a2540;color:#4A6FA5;border:1px solid #2e3d5a;}
+.ocr-status.done{background:#0d2a1f;color:#4ade80;border:1px solid #4ade8030;}
+.ocr-status.error{background:#2a1020;color:#e05c7a;border:1px solid #e05c7a30;}
+
+/* Champs édition */
+.field-group{margin-bottom:.9rem;}
+.field-label{font-size:.65rem;color:#4A6FA5;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.3rem;}
+.field-input{width:100%;background:#0d1321;border:1px solid #2e3d5a;border-radius:8px;padding:10px 12px;font-size:.9rem;color:#e8f0f8;outline:none;}
+.field-input:focus{border-color:#4A6FA5;}
+.field-textarea{width:100%;background:#0d1321;border:1px solid #2e3d5a;border-radius:8px;padding:10px 12px;font-size:.85rem;color:#e8f0f8;outline:none;min-height:80px;resize:vertical;font-family:-apple-system,sans-serif;}
+.field-textarea:focus{border-color:#4A6FA5;}
+
+.btn-save{width:100%;background:#4A6FA5;color:#fff;border:none;border-radius:10px;padding:14px;font-size:1rem;font-weight:800;cursor:pointer;margin-top:.5rem;}
+.btn-save:active{opacity:.85;}
+.btn-delete{width:100%;background:none;border:1px solid #e05c7a;color:#e05c7a;border-radius:10px;padding:12px;font-size:.88rem;font-weight:700;cursor:pointer;margin-top:.5rem;}
+
+/* Progress bar OCR */
+.progress-wrap{height:4px;background:#1e2d4a;border-radius:99px;overflow:hidden;margin:.5rem 0;}
+.progress-fill{height:100%;background:#4A6FA5;border-radius:99px;transition:width .3s ease;width:0%;}
+
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a2540;border:1px solid #4A6FA5;border-radius:99px;padding:8px 20px;font-size:.78rem;color:#4A6FA5;font-weight:700;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="app-title">CARTES DE VISITE</div>
+      <div class="app-sub">Scanner & archiver</div>
+    </div>
+    <button class="btn-scan" onclick="openScan()">📷 Scanner</button>
+  </div>
+  <div class="search-wrap" style="padding:.7rem 0 0;">
+    <input class="search-input" id="search" placeholder="🔍 Rechercher nom, société, email…" oninput="render()"/>
+  </div>
+</div>
+
+<div class="cards-list" id="cards-list"></div>
+
+<!-- MODAL SCAN / EDIT -->
+<div class="modal" id="modal">
+  <div class="modal-header">
+    <span class="modal-title" id="modal-title">📷 Nouvelle carte</span>
+    <button class="btn-close" onclick="closeModal()">✕</button>
+  </div>
+  <div class="modal-body">
+
+    <!-- Photo -->
+    <div class="photo-zone" id="photo-zone" onclick="document.getElementById('file-input').click()">
+      <div id="photo-placeholder">
+        <div style="font-size:2.5rem">📷</div>
+        <div class="photo-label">Appuyer pour prendre une photo<br>ou choisir dans la galerie</div>
+      </div>
+      <img id="photo-preview" style="display:none"/>
+    </div>
+    <input type="file" id="file-input" accept="image/*" capture="environment" onchange="handlePhoto(this)"/>
+
+    <div id="ocr-status" class="ocr-status" style="display:none"></div>
+    <div class="progress-wrap" id="progress-wrap" style="display:none">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <!-- Champs -->
+    <div class="field-group">
+      <div class="field-label">Nom</div>
+      <input class="field-input" id="f-name" type="text" placeholder="Jean Dupont"/>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Société</div>
+      <input class="field-input" id="f-company" type="text" placeholder="Acme Corp"/>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Poste</div>
+      <input class="field-input" id="f-job" type="text" placeholder="Directeur commercial"/>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Email</div>
+      <input class="field-input" id="f-email" type="email" placeholder="jean@acme.fr"/>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Téléphone</div>
+      <input class="field-input" id="f-phone" type="tel" placeholder="+33 6 12 34 56 78"/>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Site web</div>
+      <input class="field-input" id="f-web" type="text" placeholder="www.acme.fr"/>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Notes</div>
+      <textarea class="field-textarea" id="f-notes" placeholder="Notes personnelles…"></textarea>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Texte brut OCR (modifiable)</div>
+      <textarea class="field-textarea" id="f-raw" placeholder="Texte reconnu automatiquement…"></textarea>
+    </div>
+
+    <button class="btn-save" onclick="saveCard()">💾 Enregistrer</button>
+    <button class="btn-delete" id="btn-delete" style="display:none" onclick="deleteCard()">🗑 Supprimer cette carte</button>
+    <div style="height:2rem"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+'use strict';
+const SK = 'cartes_visite_v1';
+let cards = [];
+let editId = null;
+let currentPhotoB64 = null;
+
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SK) || '[]');
+    cards = Array.isArray(d) ? d : [];
+  } catch(e) { cards = []; }
+}
+
+function save() {
+  try { localStorage.setItem(SK, JSON.stringify(cards)); } catch(e) {
+    toast('⚠ Stockage plein — compressez les photos');
+  }
+}
+
+function uid() { return Date.now() + Math.random().toString(36).slice(2); }
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function render() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  const list = document.getElementById('cards-list');
+  const filtered = q ? cards.filter(c =>
+    [c.name, c.company, c.email, c.phone, c.job, c.web, c.notes, c.raw]
+      .some(v => v && v.toLowerCase().includes(q))
+  ) : [...cards];
+  filtered.sort((a,b) => (b.ts||0) - (a.ts||0));
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📇</div>' +
+      (q ? 'Aucun résultat pour "' + q + '"' : 'Aucune carte.<br>Appuyez sur 📷 Scanner pour commencer.') +
+      '</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(c => {
+    const date = c.ts ? new Date(c.ts).toLocaleDateString('fr-FR') : '';
+    return '<div class="card-item" onclick="openEdit(\'' + c.id + '\')">' +
+      '<div class="card-name">' + esc(c.name || 'Sans nom') + '</div>' +
+      (c.company ? '<div class="card-company">' + esc(c.company) + '</div>' : '') +
+      '<div class="card-info">' +
+        (c.job   ? esc(c.job) + '<br>' : '') +
+        (c.email ? '✉ ' + esc(c.email) + '<br>' : '') +
+        (c.phone ? '📞 ' + esc(c.phone) : '') +
+      '</div>' +
+      '<div class="card-date">' + date + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function openScan() {
+  editId = null;
+  currentPhotoB64 = null;
+  document.getElementById('modal-title').textContent = '📷 Nouvelle carte';
+  document.getElementById('btn-delete').style.display = 'none';
+  clearFields();
+  resetPhoto();
+  document.getElementById('modal').classList.add('open');
+}
+
+function openEdit(id) {
+  const c = cards.find(x => x.id === id);
+  if (!c) return;
+  editId = id;
+  currentPhotoB64 = c.photo || null;
+  document.getElementById('modal-title').textContent = '✏️ Modifier la carte';
+  document.getElementById('btn-delete').style.display = 'block';
+  document.getElementById('f-name').value    = c.name    || '';
+  document.getElementById('f-company').value = c.company || '';
+  document.getElementById('f-job').value     = c.job     || '';
+  document.getElementById('f-email').value   = c.email   || '';
+  document.getElementById('f-phone').value   = c.phone   || '';
+  document.getElementById('f-web').value     = c.web     || '';
+  document.getElementById('f-notes').value   = c.notes   || '';
+  document.getElementById('f-raw').value     = c.raw     || '';
+  document.getElementById('ocr-status').style.display = 'none';
+  document.getElementById('progress-wrap').style.display = 'none';
+  if (c.photo) {
+    document.getElementById('photo-preview').src = c.photo;
+    document.getElementById('photo-preview').style.display = 'block';
+    document.getElementById('photo-placeholder').style.display = 'none';
+  } else { resetPhoto(); }
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function clearFields() {
+  ['f-name','f-company','f-job','f-email','f-phone','f-web','f-notes','f-raw']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ocr-status').style.display = 'none';
+  document.getElementById('progress-wrap').style.display = 'none';
+}
+
+function resetPhoto() {
+  document.getElementById('photo-preview').style.display = 'none';
+  document.getElementById('photo-placeholder').style.display = 'block';
+  document.getElementById('file-input').value = '';
+}
+
+function handlePhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const b64 = e.target.result;
+    currentPhotoB64 = b64;
+    document.getElementById('photo-preview').src = b64;
+    document.getElementById('photo-preview').style.display = 'block';
+    document.getElementById('photo-placeholder').style.display = 'none';
+    runOCR(b64);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function runOCR(imageData) {
+  const status = document.getElementById('ocr-status');
+  const progressWrap = document.getElementById('progress-wrap');
+  const progressFill = document.getElementById('progress-fill');
+  status.style.display = 'block';
+  status.className = 'ocr-status loading';
+  status.textContent = '🔍 Analyse en cours…';
+  progressWrap.style.display = 'block';
+  progressFill.style.width = '0%';
+
+  try {
+    const result = await Tesseract.recognize(imageData, 'fra+eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          progressFill.style.width = Math.round(m.progress * 100) + '%';
+        }
+      }
+    });
+
+    const text = result.data.text.trim();
+    document.getElementById('f-raw').value = text;
+    progressFill.style.width = '100%';
+
+    // Extraction intelligente
+    parseOCR(text);
+
+    status.className = 'ocr-status done';
+    status.textContent = '✅ Texte reconnu — vérifiez et corrigez si besoin';
+    progressWrap.style.display = 'none';
+  } catch(e) {
+    status.className = 'ocr-status error';
+    status.textContent = '❌ Erreur OCR — saisissez manuellement';
+    progressWrap.style.display = 'none';
+  }
+}
+
+function parseOCR(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+
+  // Email
+  const emailMatch = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch && !document.getElementById('f-email').value)
+    document.getElementById('f-email').value = emailMatch[0];
+
+  // Téléphone
+  const phoneMatch = text.match(/(\+?\d[\d\s\.\-\(\)]{7,15}\d)/);
+  if (phoneMatch && !document.getElementById('f-phone').value)
+    document.getElementById('f-phone').value = phoneMatch[0].trim();
+
+  // Site web
+  const webMatch = text.match(/(www\.[^\s]+|https?:\/\/[^\s]+)/i);
+  if (webMatch && !document.getElementById('f-web').value)
+    document.getElementById('f-web').value = webMatch[0];
+
+  // Nom — première ligne longue sans chiffres ni @
+  if (!document.getElementById('f-name').value) {
+    const nameLine = lines.find(l => l.length > 3 && !/[@\d\/]/.test(l) && !/www/i.test(l));
+    if (nameLine) document.getElementById('f-name').value = nameLine;
+  }
+}
+
+function saveCard() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name && !document.getElementById('f-company').value.trim()) {
+    toast('⚠ Saisissez au moins un nom ou une société');
+    return;
+  }
+  const card = {
+    id:      editId || uid(),
+    ts:      editId ? (cards.find(c=>c.id===editId)?.ts || Date.now()) : Date.now(),
+    photo:   currentPhotoB64,
+    name:    document.getElementById('f-name').value.trim(),
+    company: document.getElementById('f-company').value.trim(),
+    job:     document.getElementById('f-job').value.trim(),
+    email:   document.getElementById('f-email').value.trim(),
+    phone:   document.getElementById('f-phone').value.trim(),
+    web:     document.getElementById('f-web').value.trim(),
+    notes:   document.getElementById('f-notes').value.trim(),
+    raw:     document.getElementById('f-raw').value.trim(),
+  };
+  if (editId) {
+    cards = cards.map(c => c.id === editId ? card : c);
+  } else {
+    cards.unshift(card);
+  }
+  save(); render(); closeModal();
+  toast(editId ? '✓ Carte mise à jour' : '✓ Carte enregistrée');
+}
+
+function deleteCard() {
+  if (!confirm('Supprimer cette carte ?')) return;
+  cards = cards.filter(c => c.id !== editId);
+  save(); render(); closeModal();
+  toast('🗑 Carte supprimée');
+}
+
+load(); render();
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/CarteV/sw.js", {updateViaCache: 'none'})
+      .then(reg => {
+        reg.addEventListener("updatefound", () => {
+          const newSW = reg.installing;
+          newSW.addEventListener("statechange", () => {
+            if (newSW.state === "installed" && navigator.serviceWorker.controller) {
+              if (confirm('🔄 Nouvelle version disponible ! Mettre à jour ?')) {
+                newSW.postMessage("SKIP_WAITING");
+                window.location.reload();
+              }
+            }
+          });
+        });
+      }).catch(e => console.warn("SW:", e));
+  });
+}
+</script>
+</body>
+</html>
