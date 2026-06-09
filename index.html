@@ -412,7 +412,6 @@ svg#arrows {
       <button class="btn sm" id="btnSettings">&#9881;&#65039;</button>
       <button class="btn sm" id="btnLayout">&#8859; Auto</button>
       <button class="btn sm" id="btnConnect">&#8674; Lier</button>
-      <button class="btn sm" id="btnPDF">&#128196; PDF</button>
       <button class="btn sm primary" id="btnAdd">&#65291;</button>
     </div>
   </header>
@@ -446,6 +445,7 @@ svg#arrows {
         <button class="btn" id="btnZoomIn">+</button>
         <button class="btn" id="btnZoomOut">-</button>
         <button class="btn" id="btnFit">&#8861;</button>
+        <button class="btn" id="btnPDF" title="Exporter PDF" style="font-size:16px;">&#128196;</button>
       </div>
     </div>
     <div class="info-bar">
@@ -456,15 +456,24 @@ svg#arrows {
   </div>
 
   <div class="view" id="view-tasks">
+    <div style="padding:10px 14px 0;flex-shrink:0">
+      <button onclick="exportPDF()" style="width:100%;padding:10px;background:var(--accent);border:none;border-radius:10px;color:#0e1628;font-family:'DM Mono',monospace;font-size:12px;font-weight:700;cursor:pointer;">&#128196; Exporter en PDF &amp; envoyer par e-mail</button>
+    </div>
     <div class="form-view" id="taskList"></div>
   </div>
 
   <div class="view" id="view-stats">
+    <div style="padding:10px 14px 0;flex-shrink:0">
+      <button onclick="exportPDF()" style="width:100%;padding:10px;background:var(--accent);border:none;border-radius:10px;color:#0e1628;font-family:'DM Mono',monospace;font-size:12px;font-weight:700;cursor:pointer;">&#128196; Exporter en PDF &amp; envoyer par e-mail</button>
+    </div>
     <div class="stats-view" id="statsContent"></div>
   </div>
 
   <div class="view" id="view-gantt">
     <div class="gantt-view" id="ganttView">
+      <div style="padding:10px 14px 0;flex-shrink:0">
+        <button onclick="exportPDF()" style="width:100%;padding:10px;background:var(--accent);border:none;border-radius:10px;color:#0e1628;font-family:'DM Mono',monospace;font-size:12px;font-weight:700;cursor:pointer;">&#128196; Exporter en PDF &amp; envoyer par e-mail</button>
+      </div>
       <div class="gantt-scroll" id="ganttScroll">
         <div class="gantt-container" id="ganttContainer"></div>
       </div>
