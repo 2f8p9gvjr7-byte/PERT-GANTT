@@ -1651,45 +1651,135 @@ function exportPDF() {
   var ganttSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="'+svgW+'" height="'+svgH+'" viewBox="0 0 '+svgW+' '+svgH+'">'+svgRows+'</svg>';
   var ganttB64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(ganttSVG)));
 
-  // Build task table rows
+  // Build task table rows — with real dates/times if available
   var tableRows = sorted.map(function(t) {
     var pnames = (t.preds||[]).map(function(pid){
       var pp=tasks.filter(function(x){return x.id===pid;})[0]; return pp?pp.id:'?';
     }).join(', ') || '—';
-    var isCrit = t.critical;
-    var rowBg  = isCrit ? '#fff0f0' : '#ffffff';
-    var idColor= isCrit ? '#c0392b' : '#1a1a2e';
-    var nmColor= isCrit ? '#c0392b' : '#1a1a2e';
+    var isCrit  = t.critical;
+    var rowBg   = isCrit ? '#fff0f0' : '#ffffff';
+    var idColor = isCrit ? '#c0392b' : '#1a1a2e';
+    var nmColor = isCrit ? '#c0392b' : '#1a1a2e';
+    var realES  = t.dateES ? t.dateES : PRE+t.es;
+    var realEF  = t.dateEF ? t.dateEF : PRE+t.ef;
+    var realLS  = t.dateLS ? t.dateLS : PRE+(t.ls===Infinity?'?':t.ls);
     return '<tr style="background:'+rowBg+'">'
       +'<td style="color:'+idColor+';font-weight:700">'+t.id+'</td>'
       +'<td style="color:'+nmColor+';font-weight:'+(isCrit?'700':'400')+'">'+t.name+'</td>'
       +'<td style="text-align:center;color:#333">'+t.dur+SUF+'</td>'
-      +'<td style="text-align:center;color:#1a6b2a;font-weight:600">'+PRE+t.es+'</td>'
-      +'<td style="text-align:center;color:#1a6b2a;font-weight:600">'+PRE+t.ef+'</td>'
-      +'<td style="text-align:center;color:#1a5c8a;font-weight:600">'+PRE+(t.ls===Infinity?'?':t.ls)+'</td>'
+      +'<td style="text-align:center;color:#1a6b2a;font-weight:600">'+realES+'</td>'
+      +'<td style="text-align:center;color:#1a6b2a;font-weight:600">'+realEF+'</td>'
+      +'<td style="text-align:center;color:#1a5c8a;font-weight:600">'+realLS+'</td>'
       +'<td style="text-align:center;color:'+(t.slack===0?'#c0392b':'#1a6b2a')+';font-weight:700">'+t.slack+SUF+'</td>'
       +'<td style="color:#555">'+pnames+'</td>'
       +'</tr>';
   }).join('');
 
+  // Build individual participant sheets
+  var participantSheets = sorted.map(function(t) {
+    var isCrit  = t.critical;
+    var realES  = t.dateES ? t.dateES : PRE+t.es;
+    var realEF  = t.dateEF ? t.dateEF : PRE+t.ef;
+    var realLS  = t.dateLS ? t.dateLS : PRE+(t.ls===Infinity?'?':t.ls);
+    var realLF  = t.dateLF ? t.dateLF : PRE+(t.lf===Infinity?'?':t.lf);
+    var predList = (t.preds||[]).map(function(pid){
+      var pp=tasks.filter(function(x){return x.id===pid;})[0];
+      if (!pp) return '';
+      var ppEF = pp.dateEF ? pp.dateEF : PRE+pp.ef;
+      return '<tr><td style="color:#1a1a2e;font-weight:600;padding:4px 8px">'+pp.id+' \u2014 '+pp.name+'</td>'
+        +'<td style="color:#1a6b2a;text-align:center;padding:4px 8px">'+ppEF+'</td></tr>';
+    }).join('');
+    var succList = tasks.filter(function(s){return (s.preds||[]).indexOf(t.id)>=0;}).map(function(s){
+      var sES = s.dateES ? s.dateES : PRE+s.es;
+      return '<span style="display:inline-block;background:#f0f4ff;border:1px solid #aac;border-radius:5px;padding:2px 8px;margin:2px;font-size:10px;color:#1a1a2e">'+s.id+' '+s.name+' (\u2192 d\u00e9bute '+sES+')</span>';
+    }).join('');
+    var bdr  = isCrit ? '#c0392b' : '#f5a623';
+    var hbg  = isCrit ? '#c0392b' : '#1a2540';
+    var badge= isCrit
+      ? '<span style="background:#c0392b;color:#fff;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;margin-left:8px">\u26a0 CHEMIN CRITIQUE</span>'
+      : '<span style="background:#1a6b2a;color:#fff;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;margin-left:8px">\u2713 Hors critique</span>';
+
+    return '<div style="page-break-inside:avoid;border:2px solid '+bdr+';border-radius:10px;overflow:hidden;margin-bottom:18px">'
+      // Header
+      +'<div style="background:'+hbg+';padding:12px 14px;color:#fff">'
+        +'<div style="font-size:9px;color:'+(isCrit?'#ffaaaa':'#f5a623')+';letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">'+p.name+'</div>'
+        +'<div style="font-size:17px;font-weight:800">'+t.id+' \u2014 '+t.name+badge+'</div>'
+      +'</div>'
+      // 4 key dates
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr">'
+        +'<div style="padding:10px;border-right:1px solid #dde;border-bottom:1px solid #dde;text-align:center">'
+          +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">\ud83d\udfe2 D\u00e9but au + t\u00f4t</div>'
+          +'<div style="font-size:18px;font-weight:800;color:#1a6b2a">'+realES+'</div>'
+          +'<div style="font-size:8px;color:#aaa">ES = '+PRE+t.es+'</div>'
+        +'</div>'
+        +'<div style="padding:10px;border-right:1px solid #dde;border-bottom:1px solid #dde;text-align:center">'
+          +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">\ud83c\udfc1 Fin au + t\u00f4t</div>'
+          +'<div style="font-size:18px;font-weight:800;color:#1a6b2a">'+realEF+'</div>'
+          +'<div style="font-size:8px;color:#aaa">EF = '+PRE+t.ef+'</div>'
+        +'</div>'
+        +'<div style="padding:10px;border-right:1px solid #dde;border-bottom:1px solid #dde;text-align:center">'
+          +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">\u23f0 D\u00e9but au + tard</div>'
+          +'<div style="font-size:18px;font-weight:800;color:#1a5c8a">'+realLS+'</div>'
+          +'<div style="font-size:8px;color:#aaa">LS = '+PRE+(t.ls===Infinity?'?':t.ls)+'</div>'
+        +'</div>'
+        +'<div style="padding:10px;border-bottom:1px solid #dde;text-align:center">'
+          +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">\u231b Fin au + tard</div>'
+          +'<div style="font-size:18px;font-weight:800;color:#1a5c8a">'+realLF+'</div>'
+          +'<div style="font-size:8px;color:#aaa">LF = '+PRE+(t.lf===Infinity?'?':t.lf)+'</div>'
+        +'</div>'
+      +'</div>'
+      // Duration + slack
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #dde">'
+        +'<div style="padding:8px 12px;border-right:1px solid #dde">'
+          +'<span style="font-size:8px;color:#888;text-transform:uppercase">Dur\u00e9e</span> '
+          +'<span style="font-size:14px;font-weight:800;color:#1a1a2e;margin-left:6px">'+t.dur+' '+FULL.replace(/s$/,'')+'</span>'
+        +'</div>'
+        +'<div style="padding:8px 12px">'
+          +'<span style="font-size:8px;color:#888;text-transform:uppercase">Marge</span> '
+          +'<span style="font-size:14px;font-weight:800;margin-left:6px;color:'+(t.slack===0?'#c0392b':'#1a6b2a')+'">'
+            +(t.slack===0 ? '0 \u2014 Aucun retard tol\u00e9r\u00e9 !' : t.slack+SUF+' de souplesse')
+          +'</span>'
+        +'</div>'
+      +'</div>'
+      // Prerequisites
+      +(predList
+        ? '<div style="padding:8px 12px;border-bottom:1px solid #dde">'
+            +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:4px">\u2705 Ne peut d\u00e9marrer qu\'apr\u00e8s</div>'
+            +'<table style="width:100%;border-collapse:collapse;font-size:10px">'
+              +'<tr style="background:#f5f7fa"><th style="text-align:left;padding:4px 8px;color:#555;font-weight:600">T\u00e2che</th><th style="padding:4px 8px;color:#555;font-weight:600">Se termine le</th></tr>'
+              +predList
+            +'</table></div>'
+        : '')
+      // Successors
+      +(succList
+        ? '<div style="padding:8px 12px;border-bottom:1px solid #dde">'
+            +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:4px">\u27a1 Active ensuite</div>'
+            +succList+'</div>'
+        : '')
+      // Notes
+      +'<div style="padding:8px 12px;background:#fafbfc">'
+        +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:4px">\ud83d\udcdd Notes</div>'
+        +'<div style="border:1px dashed #ccc;border-radius:6px;height:36px;background:#fff"></div>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+
   // Critical path
-  var cpText = res.critTasks.map(function(t){return t.id+' '+t.name;}).join(' → ');
+  var cpText = res.critTasks.map(function(t){return t.id+' '+t.name;}).join(' \u2192 ');
 
   // Stats
-  var noCrit = tasks.filter(function(t){return !t.critical;});
-  var avgSlack = noCrit.length ? (noCrit.reduce(function(s,t){return s+(t.slack||0);},0)/noCrit.length).toFixed(1) : '—';
+  var noCrit   = tasks.filter(function(t){return !t.critical;});
+  var avgSlack = noCrit.length ? (noCrit.reduce(function(s,t){return s+(t.slack||0);},0)/noCrit.length).toFixed(1) : '\u2014';
 
-  // Date info
+  // Date info line
   var dateInfo = '';
   if (p._realStart && p._realEnd) {
-    dateInfo = '<p style="margin:0 0 4px;font-size:11px;color:#5bc4f5">&#128197; '
-      + (p.dateMode==='end'?'Date de fin : ':'Date de début : ')
-      + '<b>'+p.dateAnchor+'</b>'
-      + ' &nbsp;|&nbsp; Période : <b>'+p._realStart+' → '+p._realEnd+'</b></p>';
+    dateInfo = '<p style="margin:0 0 8px;font-size:11px;color:#1a5c8a">&#128197; '
+      +(p.dateMode==='end'?'Date de fin : ':'Date de d\u00e9but : ')
+      +'<b>'+p.dateAnchor+'</b> &nbsp;|\u00a0 P\u00e9riode : <b>'+p._realStart+' \u2192 '+p._realEnd+'</b></p>';
   }
 
-  // Build full HTML page
-  var now = new Date().toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  var now = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 
   var html = '<!DOCTYPE html><html lang="fr"><head>'
     +'<meta charset="UTF-8">'
@@ -1699,7 +1789,7 @@ function exportPDF() {
     +'body{font-family:Arial,sans-serif;font-size:11px;background:#fff;color:#1a1a2e;padding:20px}'
     +'h1{font-size:20px;color:#1a1a2e;margin-bottom:4px}'
     +'h2{font-size:13px;color:#b07800;margin:18px 0 8px;border-bottom:2px solid #f5a623;padding-bottom:4px;text-transform:uppercase;letter-spacing:1px}'
-    +'.meta{font-size:10px;color:#555;margin-bottom:16px}'
+    +'.meta{font-size:10px;color:#555;margin-bottom:14px}'
     +'.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}'
     +'.stat-box{background:#f5f7fa;border-radius:8px;padding:10px 12px;border-left:3px solid #f5a623}'
     +'.stat-label{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.5px}'
@@ -1711,48 +1801,48 @@ function exportPDF() {
     +'tr:nth-child(even) td{background:#f5f7fa}'
     +'.gantt-section{page-break-before:always}'
     +'.gantt-bg{background:#0e1628;border-radius:8px;padding:10px;display:inline-block;max-width:100%}'
-    +'.footer{margin-top:20px;font-size:9px;color:#888;text-align:right;border-top:1px solid #dde;padding-top:8px}'
+    +'.footer{margin-top:16px;font-size:9px;color:#888;text-align:right;border-top:1px solid #dde;padding-top:6px}'
     +'@media print{body{padding:8px}.gantt-section{page-break-before:always}button{display:none!important}}'
     +'</style></head><body>'
 
-    // Header
     +'<h1>&#9672; '+p.name+'</h1>'
-    +'<div class="meta">'+(p.desc?p.desc+' &nbsp;|&nbsp; ':'')+FULL+' &nbsp;|&nbsp; Généré le '+now+'</div>'
+    +'<div class="meta">'+(p.desc?p.desc+' &nbsp;|&nbsp; ':'')+FULL+' &nbsp;|&nbsp; G\u00e9n\u00e9r\u00e9 le '+now+'</div>'
     +dateInfo
 
-    // Stats
-    +'<h2>Résumé</h2>'
+    +'<h2>R\u00e9sum\u00e9</h2>'
     +'<div class="stats">'
-      +'<div class="stat-box"><div class="stat-label">Durée totale</div><div class="stat-val">'+res.maxEF+'<span style="font-size:13px;font-weight:400"> '+SUF+'</span></div></div>'
-      +'<div class="stat-box"><div class="stat-label">Tâches</div><div class="stat-val">'+tasks.length+'</div></div>'
+      +'<div class="stat-box"><div class="stat-label">Dur\u00e9e totale</div><div class="stat-val">'+res.maxEF+'<span style="font-size:13px;font-weight:400"> '+SUF+'</span></div></div>'
+      +'<div class="stat-box"><div class="stat-label">T\u00e2ches</div><div class="stat-val">'+tasks.length+'</div></div>'
       +'<div class="stat-box" style="border-left-color:#c0392b"><div class="stat-label">Sur chemin critique</div><div class="stat-val" style="color:#c0392b">'+res.critTasks.length+'</div></div>'
     +'</div>'
     +'<div class="cp-box">&#9888; Chemin critique : '+cpText+'</div>'
 
-    // Task table
-    +'<h2>Toutes les tâches</h2>'
+    +'<h2>Toutes les t\u00e2ches</h2>'
     +'<table><thead><tr>'
-      +'<th>ID</th><th>Nom</th><th>Durée</th>'
-      +'<th>ES</th><th>EF</th><th>LS</th><th>Marge</th><th>Antécédents</th>'
+      +'<th>ID</th><th>Nom</th><th>Dur\u00e9e</th>'
+      +'<th>D\u00e9but (ES)</th><th>Fin (EF)</th><th>Au + tard (LS)</th><th>Marge</th><th>Ant\u00e9c\u00e9dents</th>'
     +'</tr></thead><tbody>'+tableRows+'</tbody></table>'
 
-    // Gantt
     +'<div class="gantt-section">'
     +'<h2>Diagramme de Gantt</h2>'
     +'<div class="gantt-bg"><img src="'+ganttB64+'" style="max-width:100%;display:block"/></div>'
     +'</div>'
 
-    // Footer
-    +'<div class="footer">PERT &amp; GANTT Planner &mdash; '+p.name+' &mdash; '+now+'</div>'
+    +'<div class="footer">PERT &amp; GANTT Planner \u2014 '+p.name+' \u2014 '+now+'</div>'
 
-    // Print button (hidden in print)
-    +'<div style="text-align:center;margin-top:16px">'
-      +'<button onclick="window.print()" style="background:#f5a623;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;color:#0e1628">&#128424; Imprimer / Enregistrer en PDF</button>'
-      +'<button onclick="window.close()" style="background:#eee;border:none;border-radius:8px;padding:10px 16px;font-size:12px;cursor:pointer;margin-left:8px;color:#333">Fermer</button>'
+    +'<div style="page-break-before:always">'
+    +'<h2 style="margin-top:0">&#128101; Fiches participants</h2>'
+    +'<p style="font-size:10px;color:#666;margin-bottom:14px">Une fiche par t\u00e2che \u2014 \u00e0 distribuer \u00e0 chaque responsable</p>'
+    +participantSheets
+    +'</div>'
+
+    +'<div style="text-align:center;margin-top:20px">'
+      +'<button onclick="window.print()" style="background:#f5a623;border:none;border-radius:8px;padding:12px 28px;font-size:13px;font-weight:700;cursor:pointer;color:#0e1628">&#128424; Imprimer / Enregistrer en PDF</button>'
+      +'<button onclick="window.close()" style="background:#eee;border:none;border-radius:8px;padding:12px 16px;font-size:12px;cursor:pointer;margin-left:8px;color:#333">Fermer</button>'
     +'</div>'
     +'</body></html>';
 
-  // Open in new window
+    // Open in new window
   var win = window.open('', '_blank', 'width=800,height=700');
   if (win) {
     win.document.write(html);
