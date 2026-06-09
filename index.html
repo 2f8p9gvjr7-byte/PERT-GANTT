@@ -1604,6 +1604,19 @@ document.getElementById('fProjName').addEventListener('keydown',function(e){if(e
 function exportPDF() {
   var p   = currentProj();
   if (!p || !tasks.length) { alert('Aucune tâche à exporter.'); return; }
+
+  // Sync real dates from project tasks into working tasks array
+  if (p.dateAnchor) {
+    var pUnit2 = p.unit||'day';
+    if (pUnit2==='min'||pUnit2==='hour') computeTimeDates(p);
+    else computeCalendarDates(p);
+    // Copy dateES/EF/LS/LF into working tasks
+    tasks.forEach(function(t){
+      var pt = (p.tasks||[]).filter(function(x){return x.id===t.id;})[0];
+      if (pt) { t.dateES=pt.dateES; t.dateEF=pt.dateEF; t.dateLS=pt.dateLS; t.dateLF=pt.dateLF; }
+    });
+  }
+
   var res  = calcPert();
   var PRE  = unitPrefix(p);
   var SUF  = unitSuffix(p);
@@ -1651,18 +1664,31 @@ function exportPDF() {
   var ganttSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="'+svgW+'" height="'+svgH+'" viewBox="0 0 '+svgW+' '+svgH+'">'+svgRows+'</svg>';
   var ganttB64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(ganttSVG)));
 
-  // Build task table rows — with real dates/times if available
+  // French date/time formatter
+  function fmtFR(val) {
+    if (!val) return null;
+    // HH:MM — return as-is (already French format)
+    if (val.match(/^\d{2}:\d{2}$/)) return val;
+    // YYYY-MM-DD → jj/mm/aaaa
+    if (val.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      var pts = val.split('-');
+      return pts[2]+'/'+pts[1]+'/'+pts[0];
+    }
+    return val;
+  }
+
+  // Build task table rows with French dates
   var tableRows = sorted.map(function(t) {
     var pnames = (t.preds||[]).map(function(pid){
       var pp=tasks.filter(function(x){return x.id===pid;})[0]; return pp?pp.id:'?';
-    }).join(', ') || '—';
+    }).join(', ') || '\u2014';
     var isCrit  = t.critical;
     var rowBg   = isCrit ? '#fff0f0' : '#ffffff';
     var idColor = isCrit ? '#c0392b' : '#1a1a2e';
     var nmColor = isCrit ? '#c0392b' : '#1a1a2e';
-    var realES  = t.dateES ? t.dateES : PRE+t.es;
-    var realEF  = t.dateEF ? t.dateEF : PRE+t.ef;
-    var realLS  = t.dateLS ? t.dateLS : PRE+(t.ls===Infinity?'?':t.ls);
+    var realES  = fmtFR(t.dateES) || PRE+t.es;
+    var realEF  = fmtFR(t.dateEF) || PRE+t.ef;
+    var realLS  = fmtFR(t.dateLS) || PRE+(t.ls===Infinity?'?':t.ls);
     return '<tr style="background:'+rowBg+'">'
       +'<td style="color:'+idColor+';font-weight:700">'+t.id+'</td>'
       +'<td style="color:'+nmColor+';font-weight:'+(isCrit?'700':'400')+'">'+t.name+'</td>'
@@ -1675,108 +1701,21 @@ function exportPDF() {
       +'</tr>';
   }).join('');
 
-  // Build individual participant sheets
-  var participantSheets = sorted.map(function(t) {
-    var isCrit  = t.critical;
-    var realES  = t.dateES ? t.dateES : PRE+t.es;
-    var realEF  = t.dateEF ? t.dateEF : PRE+t.ef;
-    var realLS  = t.dateLS ? t.dateLS : PRE+(t.ls===Infinity?'?':t.ls);
-    var realLF  = t.dateLF ? t.dateLF : PRE+(t.lf===Infinity?'?':t.lf);
-    var predList = (t.preds||[]).map(function(pid){
-      var pp=tasks.filter(function(x){return x.id===pid;})[0];
-      if (!pp) return '';
-      var ppEF = pp.dateEF ? pp.dateEF : PRE+pp.ef;
-      return '<tr><td style="color:#1a1a2e;font-weight:600;padding:4px 8px">'+pp.id+' \u2014 '+pp.name+'</td>'
-        +'<td style="color:#1a6b2a;text-align:center;padding:4px 8px">'+ppEF+'</td></tr>';
-    }).join('');
-    var succList = tasks.filter(function(s){return (s.preds||[]).indexOf(t.id)>=0;}).map(function(s){
-      var sES = s.dateES ? s.dateES : PRE+s.es;
-      return '<span style="display:inline-block;background:#f0f4ff;border:1px solid #aac;border-radius:5px;padding:2px 8px;margin:2px;font-size:10px;color:#1a1a2e">'+s.id+' '+s.name+' (\u2192 d\u00e9bute '+sES+')</span>';
-    }).join('');
-    var bdr  = isCrit ? '#c0392b' : '#f5a623';
-    var hbg  = isCrit ? '#c0392b' : '#1a2540';
-    var badge= isCrit
-      ? '<span style="background:#c0392b;color:#fff;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;margin-left:8px">\u26a0 CHEMIN CRITIQUE</span>'
-      : '<span style="background:#1a6b2a;color:#fff;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;margin-left:8px">\u2713 Hors critique</span>';
-
-    return '<div style="page-break-inside:avoid;border:2px solid '+bdr+';border-radius:10px;overflow:hidden;margin-bottom:18px">'
-      // Header
-      +'<div style="background:'+hbg+';padding:12px 14px;color:#fff">'
-        +'<div style="font-size:9px;color:'+(isCrit?'#ffaaaa':'#f5a623')+';letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">'+p.name+'</div>'
-        +'<div style="font-size:17px;font-weight:800">'+t.id+' \u2014 '+t.name+badge+'</div>'
-      +'</div>'
-      // 4 key dates
-      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr">'
-        +'<div style="padding:10px;border-right:1px solid #dde;border-bottom:1px solid #dde;text-align:center">'
-          +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">\ud83d\udfe2 D\u00e9but au + t\u00f4t</div>'
-          +'<div style="font-size:18px;font-weight:800;color:#1a6b2a">'+realES+'</div>'
-          +'<div style="font-size:8px;color:#aaa">ES = '+PRE+t.es+'</div>'
-        +'</div>'
-        +'<div style="padding:10px;border-right:1px solid #dde;border-bottom:1px solid #dde;text-align:center">'
-          +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">\ud83c\udfc1 Fin au + t\u00f4t</div>'
-          +'<div style="font-size:18px;font-weight:800;color:#1a6b2a">'+realEF+'</div>'
-          +'<div style="font-size:8px;color:#aaa">EF = '+PRE+t.ef+'</div>'
-        +'</div>'
-        +'<div style="padding:10px;border-right:1px solid #dde;border-bottom:1px solid #dde;text-align:center">'
-          +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">\u23f0 D\u00e9but au + tard</div>'
-          +'<div style="font-size:18px;font-weight:800;color:#1a5c8a">'+realLS+'</div>'
-          +'<div style="font-size:8px;color:#aaa">LS = '+PRE+(t.ls===Infinity?'?':t.ls)+'</div>'
-        +'</div>'
-        +'<div style="padding:10px;border-bottom:1px solid #dde;text-align:center">'
-          +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">\u231b Fin au + tard</div>'
-          +'<div style="font-size:18px;font-weight:800;color:#1a5c8a">'+realLF+'</div>'
-          +'<div style="font-size:8px;color:#aaa">LF = '+PRE+(t.lf===Infinity?'?':t.lf)+'</div>'
-        +'</div>'
-      +'</div>'
-      // Duration + slack
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #dde">'
-        +'<div style="padding:8px 12px;border-right:1px solid #dde">'
-          +'<span style="font-size:8px;color:#888;text-transform:uppercase">Dur\u00e9e</span> '
-          +'<span style="font-size:14px;font-weight:800;color:#1a1a2e;margin-left:6px">'+t.dur+' '+FULL.replace(/s$/,'')+'</span>'
-        +'</div>'
-        +'<div style="padding:8px 12px">'
-          +'<span style="font-size:8px;color:#888;text-transform:uppercase">Marge</span> '
-          +'<span style="font-size:14px;font-weight:800;margin-left:6px;color:'+(t.slack===0?'#c0392b':'#1a6b2a')+'">'
-            +(t.slack===0 ? '0 \u2014 Aucun retard tol\u00e9r\u00e9 !' : t.slack+SUF+' de souplesse')
-          +'</span>'
-        +'</div>'
-      +'</div>'
-      // Prerequisites
-      +(predList
-        ? '<div style="padding:8px 12px;border-bottom:1px solid #dde">'
-            +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:4px">\u2705 Ne peut d\u00e9marrer qu\'apr\u00e8s</div>'
-            +'<table style="width:100%;border-collapse:collapse;font-size:10px">'
-              +'<tr style="background:#f5f7fa"><th style="text-align:left;padding:4px 8px;color:#555;font-weight:600">T\u00e2che</th><th style="padding:4px 8px;color:#555;font-weight:600">Se termine le</th></tr>'
-              +predList
-            +'</table></div>'
-        : '')
-      // Successors
-      +(succList
-        ? '<div style="padding:8px 12px;border-bottom:1px solid #dde">'
-            +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:4px">\u27a1 Active ensuite</div>'
-            +succList+'</div>'
-        : '')
-      // Notes
-      +'<div style="padding:8px 12px;background:#fafbfc">'
-        +'<div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:4px">\ud83d\udcdd Notes</div>'
-        +'<div style="border:1px dashed #ccc;border-radius:6px;height:36px;background:#fff"></div>'
-      +'</div>'
-      +'</div>';
-  }).join('');
-
   // Critical path
   var cpText = res.critTasks.map(function(t){return t.id+' '+t.name;}).join(' \u2192 ');
 
   // Stats
-  var noCrit   = tasks.filter(function(t){return !t.critical;});
-  var avgSlack = noCrit.length ? (noCrit.reduce(function(s,t){return s+(t.slack||0);},0)/noCrit.length).toFixed(1) : '\u2014';
+  var noCrit = tasks.filter(function(t){return !t.critical;});
 
-  // Date info line
+  // Date info line in French
   var dateInfo = '';
   if (p._realStart && p._realEnd) {
+    var startFR = fmtFR(p._realStart) || p._realStart;
+    var endFR   = fmtFR(p._realEnd)   || p._realEnd;
+    var ancFR   = fmtFR(p.dateAnchor) || p.dateAnchor;
     dateInfo = '<p style="margin:0 0 8px;font-size:11px;color:#1a5c8a">&#128197; '
-      +(p.dateMode==='end'?'Date de fin : ':'Date de d\u00e9but : ')
-      +'<b>'+p.dateAnchor+'</b> &nbsp;|\u00a0 P\u00e9riode : <b>'+p._realStart+' \u2192 '+p._realEnd+'</b></p>';
+      +(p.dateMode==='end'?'Date de fin\u00a0: ':'Date de d\u00e9but\u00a0: ')
+      +'<b>'+ancFR+'</b> &nbsp;| P\u00e9riode\u00a0: <b>'+startFR+' \u2192 '+endFR+'</b></p>';
   }
 
   var now = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -1815,7 +1754,7 @@ function exportPDF() {
       +'<div class="stat-box"><div class="stat-label">T\u00e2ches</div><div class="stat-val">'+tasks.length+'</div></div>'
       +'<div class="stat-box" style="border-left-color:#c0392b"><div class="stat-label">Sur chemin critique</div><div class="stat-val" style="color:#c0392b">'+res.critTasks.length+'</div></div>'
     +'</div>'
-    +'<div class="cp-box">&#9888; Chemin critique : '+cpText+'</div>'
+    +'<div class="cp-box">&#9888; Chemin critique\u00a0: '+cpText+'</div>'
 
     +'<h2>Toutes les t\u00e2ches</h2>'
     +'<table><thead><tr>'
@@ -1830,33 +1769,29 @@ function exportPDF() {
 
     +'<div class="footer">PERT &amp; GANTT Planner \u2014 '+p.name+' \u2014 '+now+'</div>'
 
-    +'<div style="page-break-before:always">'
-    +'<h2 style="margin-top:0">&#128101; Fiches participants</h2>'
-    +'<p style="font-size:10px;color:#666;margin-bottom:14px">Une fiche par t\u00e2che \u2014 \u00e0 distribuer \u00e0 chaque responsable</p>'
-    +participantSheets
-    +'</div>'
-
     +'<div style="text-align:center;margin-top:20px">'
       +'<button onclick="window.print()" style="background:#f5a623;border:none;border-radius:8px;padding:12px 28px;font-size:13px;font-weight:700;cursor:pointer;color:#0e1628">&#128424; Imprimer / Enregistrer en PDF</button>'
       +'<button onclick="window.close()" style="background:#eee;border:none;border-radius:8px;padding:12px 16px;font-size:12px;cursor:pointer;margin-left:8px;color:#333">Fermer</button>'
     +'</div>'
     +'</body></html>';
 
-    // Open in new window
-  var win = window.open('', '_blank', 'width=800,height=700');
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-  } else {
-    // Fallback: download as HTML file (then print as PDF)
-    var blob = new Blob([html], {type:'text/html'});
-    var url  = URL.createObjectURL(blob);
-    var a    = document.createElement('a');
-    a.href   = url;
-    a.download = p.name.replace(/[^a-z0-9]/gi,'_')+'_PERT.html';
+    // Always use blob URL — works on iPhone Safari AND desktop
+  var blob = new Blob([html], {type: 'text/html;charset=utf-8'});
+  var url  = URL.createObjectURL(blob);
+  // Try to open in new tab first
+  var win  = window.open(url, '_blank');
+  if (!win) {
+    // Safari popup blocker fallback: use invisible link click
+    var a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
+  // Revoke after short delay
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
 }
 
 // ══════════════════════════════════════════
