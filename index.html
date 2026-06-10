@@ -549,7 +549,29 @@ svg#arrows {
   </div>
 </div>
 
-<!-- PROJECT MODAL — placed on body level for guaranteed visibility -->
+<!-- PROJECT MODAL -->
+<div class="modal-overlay" id="modalProj">
+  <div class="modal">
+    <h2>Nouveau projet</h2>
+    <div class="field"><label>NOM DU PROJET</label><input type="text" id="fProjName" placeholder="ex: Anniversaire surprise"></div>
+    <div class="field"><label>DESCRIPTION (optionnel)</label><input type="text" id="fProjDesc" placeholder="ex: F&ecirc;te du 13 juin"></div>
+    <div class="field">
+      <label>Mode de planification</label>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button class="btn" id="btnModeStart" onclick="setProjMode('start')" style="flex:1;border-color:var(--accent);color:var(--accent);">&#128197; Date de d&eacute;but</button>
+        <button class="btn" id="btnModeEnd"   onclick="setProjMode('end')"   style="flex:1;">&#127937; Date de fin</button>
+      </div>
+    </div>
+    <div class="field" id="fieldProjDate">
+      <label id="labelProjDate">DATE DE D&Eacute;BUT</label>
+      <input type="date" id="fProjDate"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="btnProjCancel">Annuler</button>
+      <button class="btn primary" id="btnProjSave">Cr&eacute;er</button>
+    </div>
+  </div>
+</div>
 
 
 <!-- DETAIL MODAL -->
@@ -1582,17 +1604,10 @@ document.getElementById('btnDetailEdit').addEventListener('click',function(){
   if (detailTaskId) openEditTask(detailTaskId);
 });
 document.getElementById('modalDetail').addEventListener('click',function(e){if(e.target===e.currentTarget)document.getElementById('modalDetail').classList.remove('open');});
-// modalProj is placed at end of body — bind after DOM is ready
-window.addEventListener('DOMContentLoaded', function() {
-  var bps = document.getElementById('btnProjSave');
-  var bpc = document.getElementById('btnProjCancel');
-  var mp  = document.getElementById('modalProj');
-  var fpn = document.getElementById('fProjName');
-  if (bps) bps.addEventListener('click', saveProject);
-  if (bpc) bpc.addEventListener('click', function(){ if(mp) mp.classList.remove('open'); });
-  if (mp)  mp.addEventListener('click', function(e){ if(e.target===e.currentTarget) mp.classList.remove('open'); });
-  if (fpn) fpn.addEventListener('keydown', function(e){ if(e.key==='Enter') saveProject(); });
-});
+document.getElementById('btnProjSave').addEventListener('click',saveProject);
+document.getElementById('btnProjCancel').addEventListener('click',function(){document.getElementById('modalProj').classList.remove('open');});
+document.getElementById('modalProj').addEventListener('click',function(e){if(e.target===e.currentTarget)document.getElementById('modalProj').classList.remove('open');});
+document.getElementById('fProjName').addEventListener('keydown',function(e){if(e.key==='Enter')saveProject();});
 
 // ══════════════════════════════════════════
 // PDF EXPORT
@@ -2005,18 +2020,6 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 
-<!-- PROJECT MODAL -->
-<div class="modal-overlay" id="modalProj">
-  <div class="modal">
-    <h2>Nouveau projet</h2>
-    <div class="field"><label>NOM DU PROJET</label><input type="text" id="fProjName" placeholder="ex: Anniversaire surprise"></div>
-    <div class="field"><label>DESCRIPTION (optionnel)</label><input type="text" id="fProjDesc" placeholder="ex: F&ecirc;te du 13 juin"></div>
-    <div class="field">
-      <label>Mode de planification</label>
-      <div style="display:flex;gap:8px;margin-top:4px;">
-        <button class="btn" id="btnModeStart" onclick="setProjMode('start')" style="flex:1;border-color:var(--accent);color:var(--accent);">&#128197; Date de d&eacute;but</button>
-        <button class="btn" id="btnModeEnd"   onclick="setProjMode('end')"   style="flex:1;">&#127937; Date de fin</button>
-      </div>
     </div>
     <div class="field" id="fieldProjDate">
       <label id="labelProjDate">DATE DE D&Eacute;BUT</label>
