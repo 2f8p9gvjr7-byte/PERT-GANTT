@@ -1,56 +1,52 @@
-const CACHE_NAME = 'pert-planner-v4';
+const CACHE_NAME = 'pert-planner-v5';
+const ASSETS = ['./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 
-const ASSETS = [
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
-];
-
-// Install: cache assets and activate immediately
-self.addEventListener('install', function(event) {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(ASSETS);
+// Install: cache all assets immediately
+self.addEventListener('install', function(e) {
+  e.waitUntil(
+    caches.open(CACHE_NAME).then(function(c) {
+      return c.addAll(ASSETS);
     }).then(function() {
       return self.skipWaiting();
     })
   );
 });
 
-// Activate: delete ALL old caches immediately
-self.addEventListener('activate', function(event) {
-  event.waitUntil(
+// Activate: delete ALL old caches
+self.addEventListener('activate', function(e) {
+  e.waitUntil(
     caches.keys().then(function(keys) {
-      return Promise.all(
-        keys.map(function(key) { return caches.delete(key); })
-      );
+      return Promise.all(keys.map(function(k) { return caches.delete(k); }));
     }).then(function() {
       return self.clients.claim();
     })
   );
 });
 
-// Fetch: ALWAYS network first, cache only as offline fallback
-self.addEventListener('fetch', function(event) {
-  var url = event.request.url;
-
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') return;
-
-  event.respondWith(
-    fetch(event.request).then(function(response) {
-      // If we got a valid response, update the cache
-      if (response && response.status === 200) {
-        var clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, clone);
-        });
+// Fetch: CACHE FIRST — works offline immediately
+self.addEventListener('fetch', function(e) {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    caches.match(e.request).then(function(cached) {
+      if (cached) {
+        // Serve from cache, update in background
+        fetch(e.request).then(function(r) {
+          if (r && r.status === 200) {
+            caches.open(CACHE_NAME).then(function(c) { c.put(e.request, r); });
+          }
+        }).catch(function() {});
+        return cached;
       }
-      return response;
-    }).catch(function() {
-      // Network failed — serve from cache (offline mode)
-      return caches.match(event.request);
+      // Not in cache: try network
+      return fetch(e.request).then(function(r) {
+        if (r && r.status === 200) {
+          var clone = r.clone();
+          caches.open(CACHE_NAME).then(function(c) { c.put(e.request, clone); });
+        }
+        return r;
+      }).catch(function() {
+        return new Response('Hors ligne', {status: 503});
+      });
     })
   );
 });
