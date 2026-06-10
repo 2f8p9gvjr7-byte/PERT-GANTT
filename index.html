@@ -1059,8 +1059,10 @@ function renderStats() {
 }
 
 function renderProjScreen() {
+  try {
   var list=document.getElementById('projList');
-  var projs=appData.projects;
+  if (!list) return;
+  var projs=appData.projects||[];
   var html='';
   projs.forEach(function(p,i){
     var color=COLORS[i%COLORS.length];
@@ -1083,6 +1085,10 @@ function renderProjScreen() {
     html+='<div style="text-align:center;font-size:11px;color:var(--muted);padding:12px">Maximum '+MAX_PROJ+' projets atteint.</div>';
   }
   list.innerHTML=html;
+  } catch(e) {
+    console.error('renderProjScreen error:', e);
+    document.getElementById('projList').innerHTML='<div style="padding:20px;color:var(--accent)">Erreur d\'affichage. <button onclick="localStorage.removeItem(\''+STORAGE_K+'\');location.reload()">R&eacute;initialiser</button></div>';
+  }
 }
 
 var projMode = 'start';
@@ -1576,10 +1582,17 @@ document.getElementById('btnDetailEdit').addEventListener('click',function(){
   if (detailTaskId) openEditTask(detailTaskId);
 });
 document.getElementById('modalDetail').addEventListener('click',function(e){if(e.target===e.currentTarget)document.getElementById('modalDetail').classList.remove('open');});
-document.getElementById('btnProjSave').addEventListener('click',saveProject);
-document.getElementById('btnProjCancel').addEventListener('click',function(){document.getElementById('modalProj').classList.remove('open');});
-document.getElementById('modalProj').addEventListener('click',function(e){if(e.target===e.currentTarget)document.getElementById('modalProj').classList.remove('open');});
-document.getElementById('fProjName').addEventListener('keydown',function(e){if(e.key==='Enter')saveProject();});
+// modalProj is placed at end of body — bind after DOM is ready
+window.addEventListener('DOMContentLoaded', function() {
+  var bps = document.getElementById('btnProjSave');
+  var bpc = document.getElementById('btnProjCancel');
+  var mp  = document.getElementById('modalProj');
+  var fpn = document.getElementById('fProjName');
+  if (bps) bps.addEventListener('click', saveProject);
+  if (bpc) bpc.addEventListener('click', function(){ if(mp) mp.classList.remove('open'); });
+  if (mp)  mp.addEventListener('click', function(e){ if(e.target===e.currentTarget) mp.classList.remove('open'); });
+  if (fpn) fpn.addEventListener('keydown', function(e){ if(e.key==='Enter') saveProject(); });
+});
 
 // ══════════════════════════════════════════
 // PDF EXPORT
@@ -1945,6 +1958,16 @@ document.querySelectorAll('.tab').forEach(function(tab){
     if (v==='gantt') renderGantt();
   });
 });
+
+// Robust init: recover from corrupted localStorage
+try {
+  if (!appData || !Array.isArray(appData.projects)) {
+    appData = {projects:[]};
+  }
+} catch(e) {
+  appData = {projects:[]};
+  localStorage.removeItem(STORAGE_K);
+}
 
 if (!appData.projects.length) {
   var demo = {
