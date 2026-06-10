@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pert-planner-v3';
+const CACHE_NAME = 'pert-planner-v4';
 
 const ASSETS = [
   './index.html',
@@ -7,73 +7,50 @@ const ASSETS = [
   './icon-512.png'
 ];
 
-// Install: cache all local assets, always take control immediately
+// Install: cache assets and activate immediately
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
       return cache.addAll(ASSETS);
     }).then(function() {
-      return self.skipWaiting(); // Force new SW to activate immediately
+      return self.skipWaiting();
     })
   );
 });
 
-// Activate: delete ALL old caches, claim all clients immediately
+// Activate: delete ALL old caches immediately
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
-        keys.filter(function(key) { return key !== CACHE_NAME; })
-            .map(function(key) { return caches.delete(key); })
+        keys.map(function(key) { return caches.delete(key); })
       );
     }).then(function() {
-      return self.clients.claim(); // Take control of all open tabs
+      return self.clients.claim();
     })
   );
 });
 
-// Fetch: network-first for HTML (always get latest), cache-first for others
+// Fetch: ALWAYS network first, cache only as offline fallback
 self.addEventListener('fetch', function(event) {
   var url = event.request.url;
 
-  // Google Fonts: network first, fallback to cache
-  if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com')) {
-    event.respondWith(
-      fetch(event.request).then(function(response) {
-        var clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, clone); });
-        return response;
-      }).catch(function() {
-        return caches.match(event.request);
-      })
-    );
-    return;
-  }
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') return;
 
-  // index.html: ALWAYS network-first so updates are picked up immediately
-  if (url.endsWith('index.html') || url.endsWith('/') || url.endsWith('/PERT-GANTT/')) {
-    event.respondWith(
-      fetch(event.request).then(function(response) {
-        var clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, clone); });
-        return response;
-      }).catch(function() {
-        return caches.match(event.request);
-      })
-    );
-    return;
-  }
-
-  // Other assets: cache-first
   event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      if (cached) return cached;
-      return fetch(event.request).then(function(response) {
-        if (!response || response.status !== 200) return response;
+    fetch(event.request).then(function(response) {
+      // If we got a valid response, update the cache
+      if (response && response.status === 200) {
         var clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, clone); });
-        return response;
-      });
+        caches.open(CACHE_NAME).then(function(cache) {
+          cache.put(event.request, clone);
+        });
+      }
+      return response;
+    }).catch(function() {
+      // Network failed — serve from cache (offline mode)
+      return caches.match(event.request);
     })
   );
 });
